@@ -258,7 +258,7 @@ int local(char *argv[]) {
     format */
     qname = (unsigned char *) &packet[steps];
     change_to_dns_format(argv[1], qname);
-
+    // why have '\0' in end?
     steps = steps + (strlen((const char *) qname) + 1);
 
     /* Building the Question flags portion of the query packet */
@@ -333,25 +333,6 @@ int local(char *argv[]) {
                 rdata[i][j] = (unsigned char) packet[steps + j];
             type[i] = ntohs(rrflags->type);
         }
-
-        /* Parsing the canonical name in the RR */
-        if (ntohs(rrflags->type) == 5) {
-            temp = (unsigned char *) &packet[steps];
-            j = 0;
-            while (*temp != 0) {
-                if (*temp == 0xc0) {
-                    ++temp;
-                    temp = (unsigned char *) &packet[*temp];
-                } else {
-                    rdata[i][j] = *temp;
-                    ++j;
-                    ++temp;
-                }
-            }
-            rdata[i][j] = '\0';
-            change_to_dot_format(rdata[i]);
-            type[i] = ntohs(rrflags->type);
-        }
         steps = steps + ntohs(rrflags->rdlength);
     }
 
@@ -404,6 +385,7 @@ void change_to_dns_format(char *src, unsigned char *dest) {
 3www5apple3com0 into www.apple.com) */
 void change_to_dot_format(unsigned char *str) {
     int i, j;
+    // strlen could compute the len because of the '\0' in str?
     for (i = 0; i < strlen((const char *) str); ++i) {
         unsigned int len = str[i];
         for (j = 0; j < len; ++j) {
@@ -859,7 +841,7 @@ int main() {
     struct sockaddr_in addr;
     int nbytes, rc;
     int sock;
-    int port = 9000;
+    int port = 5353;
 
     struct Message msg;
     memset(&msg, 0, sizeof(struct Message));
