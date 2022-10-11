@@ -860,7 +860,7 @@ int main() {
     }
 
     printf("Use 'dig @ip -p 9000 domain name A' command in other terminal \nListening on port %u.\n \n", port);
-    // test if could commit
+    // test if could commit;
     while (1) {
         free_questions(msg.questions);
         free_resource_records(msg.answers);
