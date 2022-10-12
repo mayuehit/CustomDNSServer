@@ -956,7 +956,67 @@ void dns_resolver_process(struct Message *msg) {
 }
 
 void dns64_resolver_process(struct Message *msg) {
-    
+    struct ResourceRecord *beg;
+    struct ResourceRecord *rr;
+    struct Question *q;
+    int rc;
+
+    // leave most values intact for response
+    msg->qr = 1; // this is a response
+    msg->aa = 1; // this server is authoritative
+    msg->ra = 0; // no recursion available
+    msg->rcode = Ok_ResponseType;
+
+    // should already be 0
+    msg->anCount = 0;
+    msg->nsCount = 0;
+    msg->arCount = 0;
+
+    // for every question append resource records
+    q = msg->questions;
+    while (q) {
+        rr = malloc(sizeof(struct ResourceRecord));
+        memset(rr, 0, sizeof(struct ResourceRecord));
+
+        /* Change question type to A*/
+        q->qType = A_Resource_RecordType;
+
+        rr->name = strdup(q->qName);
+        rr->type = q->qType;
+        rr->class = q->qClass;
+        rr->ttl = 60 * 60; // in seconds; 0 means no caching
+
+        printf("DNS Query AAAA for '%s'\n", q->qName);
+
+        // AAAA - record type
+        switch (q->qType) {
+            case A_Resource_RecordType:
+                rr->rd_length = 16;
+                rc = get_A_Record_from_sqlite(rr->rd_data.aaaa_record.addr, q->qName);
+                if (rc < 0) {
+                    free(rr->name);
+                    free(rr);
+                    goto next;
+                }
+                break;
+        }
+        msg->anCount++;
+
+        // prepend resource record to answers list
+        beg = msg->answers;
+
+        /* Change response type to AAAA*/
+        rr->type=AAAA_Resource_RecordType;
+
+        msg->answers = rr;
+        rr->next = beg;
+
+        // jump here to omit question
+        next:
+
+        // process next question
+        q = q->next;
+    }    
 }
 
 /* @return 0 upon failure, 1 upon success */
