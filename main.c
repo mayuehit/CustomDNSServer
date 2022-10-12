@@ -234,6 +234,7 @@ int local(char *argv[]) {
     /* Obtaining the DNS servers from the resolv.conf file */
     char **dns_addr = malloc(10 * sizeof(char *));
     for (i = 0; i < 10; ++i)
+        // if use ipv6,change INET_ADDRSTRLEN to INET6_ADDRSTRLEN
         dns_addr[i] = malloc(INET_ADDRSTRLEN);
     get_dns_servers(dns_addr);
 
@@ -271,12 +272,24 @@ int local(char *argv[]) {
 
     /* Building the socket for connecting to the DNS server */
     long sock_fd;
+
+    // if use ipv6,comment this paragraph
     struct sockaddr_in servaddr;
     sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(53);
     inet_pton(AF_INET, dns_addr[0], &(servaddr.sin_addr));
+
+/*
+    // if use ipv6,cancel comment this paragraph
+    struct sockaddr_in6 servaddr;
+    sock_fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin6_family = AF_INET6;
+    servaddr.sin6_port = htons(53);
+    inet_pton(AF_INET6, dns_addr[0], &(servaddr.sin6_addr));
+*/
 
     /* Connecting to the DNS server */
     connect(sock_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
@@ -328,11 +341,17 @@ int local(char *argv[]) {
         rrflags = (RR_FLAGS *) &packet[steps];
         steps = steps + sizeof(RR_FLAGS) - 2;
 
+        printf("DNS64 Query A reply qname:%s, dealTime:%d, ancount:%d, rtype:%d, rdlength:%d\n",
+        qname,i,ntohs(header_l->ancount),ntohs(rrflags->type),ntohs(rrflags->rdlength));
+
         /* Parsing the IPv4 address in the RR */
         if (ntohs(rrflags->type) == 1) {
             for (j = 0; j < ntohs(rrflags->rdlength); ++j)
                 rdata[i][j] = (unsigned char) packet[steps + j];
             type[i] = ntohs(rrflags->type);
+            length = i;
+            steps = steps + ntohs(rrflags->rdlength);
+            break;
         }
         steps = steps + ntohs(rrflags->rdlength);
     }
