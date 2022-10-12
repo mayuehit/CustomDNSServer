@@ -757,8 +757,8 @@ void print_resource_record(struct ResourceRecord *rr) {
             case AAAA_Resource_RecordType:
                 printf("AAAA Resource Record { address ");
 
-                for (i = 0; i < 16; ++i)
-                    printf("%s%02x", (i ? ":" : ""), rd->aaaa_record.addr[i]);
+                for (i = 0; i < 16; i=i+2)
+                    printf("%s%02x%02x", (i ? ":" : ""), rd->aaaa_record.addr[i],rd->aaaa_record.addr[i+1]);
 
                 printf(" }");
                 break;
