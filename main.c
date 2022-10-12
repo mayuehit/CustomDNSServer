@@ -697,7 +697,7 @@ int decode_msg(struct Message *msg, const uint8_t *buffer, int size) {
     return 0;
 }
 
-void resolver_process(struct Message *msg) {
+void dns_resolver_process(struct Message *msg) {
     struct ResourceRecord *beg;
     struct ResourceRecord *rr;
     struct Question *q;
