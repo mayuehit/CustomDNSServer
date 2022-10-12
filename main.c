@@ -340,6 +340,10 @@ int local(char *argv[]) {
     return 0;
 }
 
+int localAAAA(char *argv[]) {
+
+}
+
 void get_dns_servers(char *str[]) {
 
     FILE *resolv_file;
@@ -461,7 +465,60 @@ int get_A_Record_from_sqlite(u_int8_t addr[4], const char domain_name[]) {
 }
 
 int get_AAAA_Record_from_sqlite(u_int8_t addr[16], const char domain_name[]){
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(
+            db,
+            "SELECT * from AAAARecords where domain_name = ? ;",
+            -1,
+            &stmt,
+            NULL
+    );
+    sqlite3_bind_text(stmt, 1, domain_name, -1, SQLITE_STATIC);
+    int ips[16] ={0} ;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int i=0;
+        for(i=0;i<16;i++){
+            ips[i]=(int)sqlite3_column_int(stmt, i+1);
+        }
+    }
 
+    if (ips[15]==0) {
+        char *argv[2] = {(char *) domain_name, (char *) domain_name};
+        localAAAA(argv);
+        int i=0;
+        for(i=0;i<16;i++){
+            ips[i]=rdata[length][i];
+        }
+        if (ips[15]==0) {
+            printf("DNS query NULL.\n");
+            return -1;
+        }
+        sqlite3_stmt *insert;
+        sqlite3_prepare_v2(
+                db,
+                "INSERT INTO AAAARecords VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                -1,
+                &insert,
+                NULL);
+
+        sqlite3_bind_text(insert, 1, (char *) domain_name, -1, SQLITE_STATIC);
+        for(i=0;i<16;i++){
+            sqlite3_bind_int(insert, i+2, ips[i]);
+        }
+        sqlite3_step(insert);
+    }else{
+        printf("DNS Query Cache hit!");
+    }
+    int i =0;
+    for(i=0;i<16;i++){
+        addr[i] = ips[i];
+    }
+    printf("DNS Query IPV6:");
+    for(i=0;i<16;i=i+2){
+        printf("%s%02x%02x",(i?":":""),addr[i],addr[i+1]);
+    }
+    printf("\n");
+    return 0;
 }
 
 void print_resource_record(struct ResourceRecord *rr) {
