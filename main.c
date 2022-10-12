@@ -1067,13 +1067,9 @@ int encode_resource_records(struct ResourceRecord *rr, uint8_t **buffer) {
         put32bits(buffer, rr->ttl);
         put16bits(buffer, rr->rd_length);
 
-        switch (rr->type) {
-            case A_Resource_RecordType:
-                for (i = 0; i < 4; ++i)
-                    put8bits(buffer, rr->rd_data.a_record.addr[i]);
-                break;
+        for(i=0;i<rr->rd_length;++i){
+            put8bits(buffer, rr->rd_data.a_record.addr[i]);
         }
-
         rr = rr->next;
     }
 
