@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <syslog.h>
 
 #define BUF_SIZE 1500
 /**
@@ -47,7 +48,7 @@ typedef struct header {
     unsigned short arcount;
 } HEADER;
 unsigned char rdata[10][254];
-
+unsigned int length = 0;
 /** Struct for the flags for the DNS Question */
 typedef struct q_flags {
     unsigned short qtype;
@@ -534,7 +535,7 @@ void print_resource_record(struct ResourceRecord *rr) {
     }
 }
 
-void print_query(struct Message *msg) {
+void print_response(struct Message *msg) {
     struct Question *q;
     q = msg->questions;
     while (q) {
@@ -753,6 +754,10 @@ void resolver_process(struct Message *msg) {
     }
 }
 
+void dns64_resolver_process(struct Message *msg) {
+    
+}
+
 /* @return 0 upon failure, 1 upon success */
 int encode_resource_records(struct ResourceRecord *rr, uint8_t **buffer) {
     int i;
@@ -825,7 +830,7 @@ void free_questions(struct Question *qq) {
 
 
 int main() {
-    int rc_ = sqlite3_open("database.db", &db);
+    int rc_ = sqlite3_open("database.sqlite", &db);
     if (rc_ != SQLITE_OK) {
 
         fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
@@ -834,60 +839,83 @@ int main() {
         return 1;
     }
 
+    struct Message msg;
+    memset(&msg, 0, sizeof(struct Message));
+
     // buffer for input/output binary packet
     uint8_t buffer[BUF_SIZE];
-    struct sockaddr_in client_addr;
-    socklen_t addr_len = sizeof(struct sockaddr_in);
-    struct sockaddr_in addr;
     int nbytes, rc;
     int sock;
     int port = 5353;
 
-    struct Message msg;
-    memset(&msg, 0, sizeof(struct Message));
 
+    /* ipv4 socket.if use ipv6,comment this paragraph */
+    struct sockaddr_in client_addr;
+    socklen_t addr_len = sizeof(struct sockaddr_in);
+    struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons(port);
-
     sock = socket(AF_INET, SOCK_DGRAM, 0);
 
+/*
+    //ipv6 socket,concel comment if use ipv6
+    struct sockaddr_in6 client_addr;
+    socklen_t addr_len = sizeof(struct sockaddr_in6);
+    struct sockaddr_in6 addr;
+    addr.sin6_family = AF_INET6;
+    addr.sin6_addr = in6addr_any;
+    addr.sin6_port = htons(port);
+    sock = socket(AF_INET6, SOCK_DGRAM, 0);
+*/
+    
     rc = bind(sock, (struct sockaddr *) &addr, addr_len);
 
     if (rc != 0) {
-        printf("Could not bind: %s\n", strerror(errno));
+        syslog(LOG_ERR,"DNS Server Could not bind: %s", strerror(errno));
         return 1;
     }
 
-    printf("Use 'dig @ip -p 9000 domain name A' command in other terminal \nListening on port %u.\n \n", port);
-    // test if could commit;
+    printf("Use 'dig @ip -p 5353 domain name A' command in other terminal \nListening on port %u.\n \n", port);
+
     while (1) {
+        // clean job
+        int i;
+        for(i=0;i<10;i++){
+            memset(rdata[i],0,sizeof(rdata[i]));
+        }
         free_questions(msg.questions);
         free_resource_records(msg.answers);
         free_resource_records(msg.authorities);
         free_resource_records(msg.additionals);
         memset(&msg, 0, sizeof(struct Message));
 
+        // deal with request
         nbytes = recvfrom(sock, buffer, sizeof(buffer), 0, (struct sockaddr *) &client_addr, &addr_len);
-
         if (decode_msg(&msg, buffer, nbytes) != 0) {
+            printf("decode request msg failed\n");
             continue;
         }
 
-        /* Print query */
-        print_query(&msg);
+        /* do normal DNS resolve job*/
+        dns_resolver_process(&msg);
 
-        resolver_process(&msg);
+        /* if DNS job not return AAAA answer,do DNS64 job next*/
+        if(msg.anCount==0&&msg.questions->qType==AAAA_Resource_RecordType){
+            printf("DNS query AAAA no result, do DNS64 job next\n");
+            dns64_resolver_process(&msg);
+            msg.questions->qType=AAAA_Resource_RecordType;
+        }
 
         /* Print response */
-        print_query(&msg);
+        print_response(&msg);
 
         uint8_t *p = buffer;
         if (encode_msg(&msg, &p) != 0) {
+            printf("encode response msg failed\n");
             continue;
         }
         int buflen = p - buffer;
         sendto(sock, buffer, buflen, 0, (struct sockaddr *) &client_addr, addr_len);
-        return 0;
     }
 }
