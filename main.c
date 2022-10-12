@@ -341,7 +341,143 @@ int local(char *argv[]) {
 }
 
 int localAAAA(char *argv[]) {
+    int argc = 2;
 
+    HEADER *header_l = NULL;
+    unsigned char *qname;
+    Q_FLAGS *qflags = NULL;
+    unsigned char name[10][254];
+    RR_FLAGS *rrflags = NULL;
+    unsigned int type[10];
+    unsigned char packet[65536];
+    unsigned char *temp;
+    int i, j, steps = 0;
+
+    /* Obtaining the DNS servers from the resolv.conf file */
+    char **dns_addr = malloc(10 * sizeof(char *));
+    // if use IPV6,change INET_ADDRSTRLEN to INET6_ADDRSTRLEN.
+    for (i = 0; i < 10; ++i)
+        dns_addr[i] = malloc(INET_ADDRSTRLEN);
+    get_dns_servers(dns_addr);
+    printf("Local DNS Server:%s\n",dns_addr[0]);
+    /* Building the Header portion of the query packet */
+    header_l = (HEADER *) &packet;
+    header_l->id = (unsigned short) htons(getpid());
+    header_l->qr = 0;
+    header_l->opcode = 0;
+    header_l->aa = 0;
+    header_l->tc = 0;
+    header_l->rd = 1;
+    header_l->ra = 0;
+    header_l->z = 0;
+    header_l->rcode = 0;
+    header_l->qdcount = htons((unsigned short) (argc - 1));
+    header_l->ancount = 0x0000;
+    header_l->nscount = 0x0000;
+    header_l->arcount = 0x0000;
+
+    steps = sizeof(HEADER);
+
+    /* Adding user-entered hostname into query packet and converting into DNS
+    format */
+    qname = (unsigned char *) &packet[steps];
+    change_to_dns_format(argv[1], qname);
+    // why have '\0' in end?
+    steps = steps + (strlen((const char *) qname) + 1);
+
+    /* Building the Question flags portion of the query packet */
+    qflags = (Q_FLAGS *) &packet[steps];
+    qflags->qtype = htons(AAAA_Resource_RecordType);
+    qflags->qclass = htons(0x0001);
+
+    steps = steps + sizeof(Q_FLAGS);
+
+    /* Building the socket for connecting to the DNS server */
+    long sock_fd;
+
+    // if use ipv6,comment this paragraph
+    struct sockaddr_in servaddr;
+    sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(53);
+    inet_pton(AF_INET, dns_addr[0], &(servaddr.sin_addr));
+
+/*
+    // if use ipv6,cancel comment this paragraph
+    struct sockaddr_in6 servaddr;
+    sock_fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin6_family = AF_INET6;
+    servaddr.sin6_port = htons(53);
+    inet_pton(AF_INET6, dns_addr[0], &(servaddr.sin6_addr));
+*/
+    /* Connecting to the DNS server */
+    connect(sock_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+
+    /* Sending the query packet to the DNS server */
+    write(sock_fd, (unsigned char *) packet, steps);
+
+    /* Receiving the response packet from the DNS server */
+    if (read(sock_fd, (unsigned char *) packet, 65536) <= 0)
+        close(sock_fd);
+    for (i = 0; i < 10; ++i)
+        free(dns_addr[i]);
+    free(dns_addr);
+
+    /* Parsing the Header portion of the reply packet */
+    header_l = (HEADER *) &packet;
+    steps = sizeof(HEADER);
+
+    /* Parsing the QNAME portion of the reply packet */
+    qname = (unsigned char *) &packet[steps];
+    change_to_dot_format(qname);
+    steps = steps + (strlen((const char *) qname) + 2);
+
+    /* Parsing the Question flags portion of the reply packet */
+    qflags = (Q_FLAGS *) &packet[steps];
+    steps = steps + sizeof(Q_FLAGS);
+
+    /* Parsing the RRs from the reply packet */
+    for (i = 0; i < ntohs(header_l->ancount); ++i) {
+
+        /* Parsing the NAME portion of the RR */
+        temp = (unsigned char *) &packet[steps];
+        j = 0;
+        while (*temp != 0) {
+            if (*temp == 0xc0) {
+                ++temp;
+                temp = (unsigned char *) &packet[*temp];
+            } else {
+                name[i][j] = *temp;
+                ++j;
+                ++temp;
+            }
+        }
+        name[i][j] = '\0';
+        change_to_dot_format(name[i]);
+        steps = steps + 2;
+
+        /* Parsing the RR flags of the RR */
+        rrflags = (RR_FLAGS *) &packet[steps];
+        steps = steps + sizeof(RR_FLAGS) - 2;
+
+        printf("DNS Query AAAA reply qname:%s, dealTime:%d, ancount:%d, rtype:%d, rdlength:%d\n",
+        qname,i,ntohs(header_l->ancount),ntohs(rrflags->type),ntohs(rrflags->rdlength));
+
+        /* Parsing the IPv6 address in the RR */
+        if (ntohs(rrflags->type) == AAAA_Resource_RecordType) {
+            for (j = 0; j < ntohs(rrflags->rdlength); ++j)
+                rdata[i][j] = (unsigned char) packet[steps + j];
+            type[i] = ntohs(rrflags->type);
+            length=i;
+            steps = steps + ntohs(rrflags->rdlength);
+            break;
+        }
+        steps = steps + ntohs(rrflags->rdlength);
+    }
+
+    return 0;
 }
 
 void get_dns_servers(char *str[]) {
@@ -484,6 +620,7 @@ int get_AAAA_Record_from_sqlite(u_int8_t addr[16], const char domain_name[]){
 
     if (ips[15]==0) {
         char *argv[2] = {(char *) domain_name, (char *) domain_name};
+        // cache not hit,query from local dns server.
         localAAAA(argv);
         int i=0;
         for(i=0;i<16;i++){
@@ -509,6 +646,7 @@ int get_AAAA_Record_from_sqlite(u_int8_t addr[16], const char domain_name[]){
     }else{
         printf("DNS Query Cache hit!");
     }
+
     int i =0;
     for(i=0;i<16;i++){
         addr[i] = ips[i];
