@@ -541,7 +541,7 @@ void change_to_dot_format(unsigned char *str) {
 /**
  * Function retrieve IP address from the database. If IP is not present in database, we connect to local server throughout
  * function local */
-int get_A_Record_from_sqlite(u_int8_t addr[4], const char domain_name[]) {
+int get_A_Record_from_sqlite(u_int8_t addr[16], const char domain_name[]) {
 
     sqlite3_stmt *stmt;
     sqlite3_prepare_v2(
@@ -564,13 +564,13 @@ int get_A_Record_from_sqlite(u_int8_t addr[4], const char domain_name[]) {
     if (ip1 == 0 && ip2 == 0 && ip3 == 0 && ip4 == 0) {
         char *argv[2] = {(char *) domain_name, (char *) domain_name};
         local(argv);
-        ip1 = rdata[1][0];
-        ip2 = rdata[1][1];
-        ip3 = rdata[1][2];
-        ip4 = rdata[1][3];
+        ip1 = rdata[length][0];
+        ip2 = rdata[length][1];
+        ip3 = rdata[length][2];
+        ip4 = rdata[length][3];
         if (ip1 == 0 && ip2 == 0 && ip3 == 0 && ip4 == 0) {
-            printf("\nThe domain name is not valid. Please try again.\n");
-            exit(0);
+            printf("DNS64 Query A NULL.\n");
+            return -1;
         }
         sqlite3_stmt *insert;
         sqlite3_prepare_v2(
@@ -587,15 +587,33 @@ int get_A_Record_from_sqlite(u_int8_t addr[4], const char domain_name[]) {
         sqlite3_bind_int(insert, 5, ip4);
         sqlite3_step(insert);
 
+    }else{
+        printf("DNS64 Query A Cache hit!\n");
     }
 
 
-    printf("IP is : %d.%d.%d.%d \n", ip1, ip2, ip3, ip4);
+    printf("DNS64 Query IPv4 is : %d.%d.%d.%d \n", ip1, ip2, ip3, ip4);
 
-    addr[0] = ip1;
-    addr[1] = ip2;
-    addr[2] = ip3;
-    addr[3] = ip4;
+    // use well-known prefix 96,top 12 is changeless
+    addr[0] = 100;
+    addr[1] = 0;
+    addr[2] = 255;
+    addr[3] = 155;
+
+    addr[4] = 0;
+    addr[5] = 0;
+    addr[6] = 0;
+    addr[7] = 0;
+
+    addr[8] = 0;
+    addr[9] = 0;
+    addr[10] = 0;
+    addr[11] = 0;
+
+    addr[12] = ip1;
+    addr[13] = ip2;
+    addr[14] = ip3;
+    addr[15] = ip4;
 
     return 0;
 }
