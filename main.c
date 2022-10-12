@@ -460,6 +460,10 @@ int get_A_Record_from_sqlite(u_int8_t addr[4], const char domain_name[]) {
     return 0;
 }
 
+int get_AAAA_Record_from_sqlite(u_int8_t addr[16], const char domain_name[]){
+
+}
+
 void print_resource_record(struct ResourceRecord *rr) {
     int i;
     while (rr) {
@@ -725,19 +729,21 @@ void dns_resolver_process(struct Message *msg) {
         rr->class = q->qClass;
         rr->ttl = 60 * 60; // in seconds; 0 means no caching
 
-        printf("Query for '%s'\n", q->qName);
+        printf("DNS Query AAAA for '%s'\n", q->qName);
 
-        // A - record type
+        // AAAA - record type
         switch (q->qType) {
-            case A_Resource_RecordType:
-                rr->rd_length = 4;
-                rc = get_A_Record_from_sqlite(rr->rd_data.a_record.addr, q->qName);
+            case AAAA_Resource_RecordType:
+                rr->rd_length = 16;
+                rc = get_AAAA_Record_from_sqlite(rr->rd_data.aaaa_record.addr, q->qName);
                 if (rc < 0) {
                     free(rr->name);
                     free(rr);
                     goto next;
                 }
                 break;
+            default:
+                goto next;
         }
         msg->anCount++;
 
