@@ -1,55 +1,31 @@
 ### Introduction
 
-SimpleDNS is a very simple DNS server.
-It was made to learn the basics of the DNS protocol.
-
-#### Report of available at: [report](https://github.com/homomorfism/dns_server/blob/master/Report%20(1).pdf)
-
-Features:
-* very small
-* single-threaded
-* all necessary data structures for further features
-* very simplistic memory management
-* supports A, AAAA and TXT queries
-* no full protection against malformed requests 
-
+DNS 64
+ 
 ### Test
 
-Start SimpleDNS:
+Start SimpleDNS 64:
 ```
 $./main
 Listening on port 9000.
 ```
 
-In another console execute [dig](http://linux.die.net/man/1/dig) to make a DNS request:
 
 ```
-$ dig @127.0.0.1 -p 9000 foo.bar.com A
-
-; <<>> DiG 9.8.4-rpz2+rl005.12-P1 <<>> @127.0.0.1 -p 9000 foo.bar.com
-; (1 server found)
-;; global options: +cmd
-;; Got answer:
-;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 15287
-;; flags: qr; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
-
-;; QUESTION SECTION:
-;foo.bar.com.                   IN      A
-
-;; ANSWER SECTION:
-foo.bar.com.            0       IN      A       192.168.1.1
-
-;; Query time: 0 msec
-;; SERVER: 127.0.0.1#9000(127.0.0.1)
-;; WHEN: Mon Apr 15 00:50:38 2013
-;; MSG SIZE  rcvd: 56
+$ dig @127.0.0.1 -p 5353 www.google.com AAAA
 ```
 
-## Modify address entries
-
-The code maps the domain "foo.bar.com" to the IPv4 address 192.168.1.1 and IPv6 address fe80::1.
-It is easy to find it in the code and to add other entries.
-
-### Recommended Reading
-
-The DNS section of the [TCP/IP-Guide](http://www.tcpipguide.com/free/t_TCPIPDomainNameSystemDNS.htm) was very helpful for understanding the protocol.
+### Install
+```sh
+# Ubuntu
+apt install sqlite3
+apt install libsqlite3-dev
+# Centos
+yum install sqlite
+yum install sqlite-devel
+---
+sqlite3 database.db
+CREATE TABLE ARecords(domain_name text,ip1 integer,ip2 integer,ip3 integer,ip4 integer)
+CREATE TABLE AAAARecords(domain_name text,ip1 integer,ip2 integer,ip3 integer,ip4 integer,ip5 integer,ip6 integer,ip7 integer,ip8 integer,ip9 integer,ip10 integer,ip11 integer,ip12 integer,ip13 integer,ip14 integer,ip15 integer,ip16 integer)
+gcc -o main main.c -lsqlite3
+```
