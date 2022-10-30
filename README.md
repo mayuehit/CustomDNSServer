@@ -1,8 +1,8 @@
 ### Introduction
 
-DNS 64
+DNS 64 binary
  
-### Test
+### Use
 
 Start SimpleDNS 64:
 ```
@@ -42,3 +42,17 @@ gcc -o main main.c -lsqlite3
 418
 1147
 ```
+
+### Performance testing
+```shell
+# test.sh
+# !/bin/bash
+num=$1
+for((i=num;i<=num+100;i++))
+do
+dig @127.0.0.1 -p 53533 www.google.com$i AAAA &
+done
+
+$ bash -x test.sh 1
+```
+本项目使用单线程处理udp请求，recvfrom一次处理一个请求，如果udp请求过多，可能会导致缓冲区满，导致后面的请求失效。
