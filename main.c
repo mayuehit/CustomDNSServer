@@ -1211,5 +1211,6 @@ int main() {
         }
         int buflen = p - buffer;
         sendto(sock, buffer, buflen, 0, (struct sockaddr *) &client_addr, addr_len);
+        printf("finish\n");
     }
 }
