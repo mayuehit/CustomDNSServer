@@ -56,3 +56,6 @@ done
 $ bash -x test.sh 1
 ```
 本项目使用单线程处理udp请求，recvfrom一次处理一个请求，如果udp请求过多，可能会导致缓冲区满，导致后面的请求失效。
+
+1、开启两个窗口 分别执行 bash -x test.sh 100;bash -x test.sh 200 服务端产生了段错误
+2、开启一个窗口 执行 bash -x test.sh 300 很多请求发生超时
